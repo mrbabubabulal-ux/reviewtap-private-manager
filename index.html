@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#111827"><title>ReviewTap — Private QR Manager</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f4f6;color:#111827;font:15px system-ui,-apple-system,Segoe UI,sans-serif}
+header{background:#111827;color:white;padding:22px max(18px,calc((100% - 1050px)/2))}header h1{margin:0;font-size:22px}header p{margin:5px 0 0;color:#cbd5e1}
+main{max-width:1050px;margin:24px auto;padding:0 16px}.panel{background:white;border:1px solid #e5e7eb;border-radius:16px;padding:20px;box-shadow:0 4px 18px #1118270a}
+input{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:9px;font:inherit;margin:6px 0 12px}
+button{border:0;border-radius:9px;background:#2563eb;color:white;padding:11px 16px;font:600 14px system-ui;cursor:pointer}button.secondary{background:#e5e7eb;color:#111827}button:disabled{opacity:.5}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px;margin-top:16px}.card{border:1px solid #e5e7eb;border-radius:13px;padding:16px;background:white}.card h3{margin:0 0 12px}.muted{color:#64748b;font-size:13px}.row{display:flex;gap:8px;align-items:center;justify-content:space-between}.link{overflow-wrap:anywhere;font-size:12px;color:#1d4ed8}.hidden{display:none}.status{margin:10px 0;color:#0f766e}.error{color:#b91c1c}.toprow{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+@media(max-width:520px){header{padding:18px}main{margin:14px auto}.panel{padding:15px}}
+</style></head>
+<body><header><h1>ReviewTap QR Manager</h1><p>Private dashboard · 10 dynamic Google Review QR codes</p></header>
+<main>
+<section id="login" class="panel"><h2>Admin login</h2><p class="muted">Only the administrator can manage QR destinations.</p>
+<label for="password">Admin password</label><input id="password" type="password" autocomplete="current-password" placeholder="Enter your password">
+<button id="loginBtn">Login</button><p id="loginMsg" class="error"></p></section>
+<section id="dashboard" class="hidden"><div class="panel"><div class="toprow"><div><h2 style="margin:0">Your 10 QR cards</h2><p class="muted">Update each card's shop name and Google Review URL. The printed QR address stays the same.</p></div><button class="secondary" id="logoutBtn">Log out</button></div><p id="baseUrl" class="muted"></p><p id="msg" class="status"></p></div><div id="cards" class="grid"></div></section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+async function api(path,body){const r=await fetch('/api/'+path,{method:body?'POST':'GET',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Request failed');return d}
+function showLogin(){ $('login').classList.remove('hidden');$('dashboard').classList.add('hidden'); }
+function showDashboard(){ $('login').classList.add('hidden');$('dashboard').classList.remove('hidden'); }
+async function load(){try{const d=await api('cards');showDashboard();$('baseUrl').textContent='Your printed QR base: '+d.base+'/r/CARD-001 (each card uses its own code)';$('cards').innerHTML='';
+d.cards.forEach(c=>{const el=document.createElement('div');el.className='card';el.innerHTML=`<h3>${c.code}</h3><label class="muted">Shop / business name</label><input class="shop" maxlength="100" placeholder="e.g. Shreeji Restaurant"><label class="muted">Google Review URL</label><input class="dest" type="url" placeholder="https://g.page/r/.../review"><div class="row"><button class="save">Save changes</button><button class="secondary copy">Copy QR link</button></div><div class="link" style="margin-top:10px"></div><div class="qr" style="margin-top:12px"></div>`;el.querySelector('.shop').value=c.shop_name||'';el.querySelector('.dest').value=c.destination_url||'';const link=d.base+'/r/'+c.code;el.querySelector('.link').textContent=link;new QRCode(el.querySelector('.qr'),{text:link,width:128,height:128});el.querySelector('.save').onclick=async()=>{try{await api('cards',{code:c.code,shop_name:el.querySelector('.shop').value,destination_url:el.querySelector('.dest').value});$('msg').textContent=c.code+' saved successfully.';$('msg').className='status'}catch(e){$('msg').textContent=e.message;$('msg').className='error'}};el.querySelector('.copy').onclick=()=>navigator.clipboard.writeText(link).then(()=>$('msg').textContent='QR link copied.');$('cards').appendChild(el)});}catch(e){showLogin();}}
+$('loginBtn').onclick=async()=>{try{await api('login',{password:$('password').value});$('loginMsg').textContent='';await load()}catch(e){$('loginMsg').textContent=e.message}};
+$('password').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginBtn').click()});
+$('logoutBtn').onclick=async()=>{await api('logout',{});showLogin()};
+load();
+</script></body></html>
